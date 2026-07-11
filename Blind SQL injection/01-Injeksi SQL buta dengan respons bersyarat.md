@@ -52,4 +52,16 @@ Hasilnya: Ketika kamu menembak angka yang salah, tulisan "Welcome back!" akan hi
 <img width="1536" height="805" alt="image" src="https://github.com/user-attachments/assets/c76b49fc-e2a5-481b-a1cb-dc796a8f7744" />
 Cookie: TrackingId=7fKDQNwonRoIkWHO'+AND+(SELECT+LENGTH(password)+FROM+users+WHERE+username%3d'administrator')%3d20--+x%3b+session%3diMWdUsrezkYSxLA47r7wBJXjFvQknrai
 
+MENEBAK PASSWORD = ' AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username='administrator')='a'-- x
+
+
+Cara Setting Burp Suite Intruder:Di menu Repeater, masukkan perintah potong huruf (SUBSTRING) ini ke cookie:TrackingId=7fKDQNwonRoIkWHO' AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username='administrator')='a'-- xKlik kanan di mana saja pada area request, lalu pilih Send to Intruder.Pergi ke tab Intruder $\rightarrow$ Positions.Ubah tipe penyerangan (Attack type) menjadi Cluster Bomb.Cari letak perintah tadi, lalu tandai dua posisi yang akan kita acak menggunakan tombol Add §:Posisi pertama: Angka 1 (menunjukkan urutan huruf keberapa yang mau ditebak). $\rightarrow$ Ubah jadi §1§Posisi kedua: Huruf a di paling ujung (menunjukkan tebakan hurufnya). $\rightarrow$ Ubah jadi §a§Hasilnya akan terlihat seperti ini: ...SUBSTRING(password,§1§,1)...='§a§'-- xPergi ke tab Payloads:Payload Set 1 (untuk posisi angka urutan huruf): Pilih tipe Numbers, lalu setting dari 1 sampai 20 (sesuai panjang password).Payload Set 2 (untuk posisi tebakan karakter): Pilih tipe Brute forcer, lalu masukkan huruf a-z dan angka 0-9.Pergi ke tab Settings, cari bagian Grep - Match, lalu ketik kata "Welcome back!" agar Burp Suite otomatis menandai jika kata tersebut muncul.Klik Start Attack!
+
+<img width="1915" height="805" alt="image" src="https://github.com/user-attachments/assets/961f8087-ed4a-4525-ac76-6feba6d5470a" />
+
+
+<img width="1918" height="741" alt="image" src="https://github.com/user-attachments/assets/12d0f748-497e-40b9-8368-53a7f3c1ba59" />
+
+
+
 
