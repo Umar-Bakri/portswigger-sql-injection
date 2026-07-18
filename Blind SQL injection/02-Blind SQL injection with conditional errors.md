@@ -13,7 +13,7 @@ Mengubah `TrackingId=xyz` menjadi `xyz'` (Error), lalu menjadi `xyz''` (Error hi
 - Memasukkan satu tanda kutip (`'`) untuk merusak struktur kueri database asli di aplikasi. Ketika halaman memunculkan error, itu bukti bahwa input cookie langsung ditempel ke kueri SQL.
 - Memasukkan dua tanda kutip (`''`). Di dalam SQL, dua tanda kutip berurutan artinya "mengabaikan tanda kutip" (*escaping*). Karena kuerinya jadi seimbang lagi, errornya hilang (`200 OK`).
 - ✅ Ini memastikan **100% ada celah SQL Injection**.
-
+- 
 ---
 
 ## 🔍 Fase 2: Menebak Jenis Mesin Database (Oracle Detection)
@@ -26,6 +26,8 @@ Setiap mesin database punya aturan bahasa (*syntax*) berbeda:
 
 - Di **MySQL/SQL Server**, perintah `SELECT ''` itu sah-sah saja.
 - Di **Oracle**, perintah `SELECT` wajib menyebutkan nama tabelnya (`FROM nama_tabel`). Oracle menyediakan tabel tiruan bawaan bernama `dual` untuk keperluan tes.
+- ' || (SELECT '' ) || ' # error 500
+- ' || (SELECT '' FROM DUAL) || ' # 200 ok
 
 Karena rumus yang pakai `FROM dual` berhasil membuat errornya hilang, didapat info berharga:
 > 🎯 **Target lab ini menggunakan database Oracle!**
@@ -40,6 +42,8 @@ Mencoba `FROM not-a-real-table` (error), lalu mencoba `FROM users WHERE ROWNUM =
 **Penjelasan:**
 - Menembak nama tabel asal-asalan → database langsung memicu error karena tabelnya tidak ada.
 - Ganti menjadi `FROM users` → halaman kembali lancar (`200 OK`). Ini membuktikan bahwa tabel bernama `users` benar-benar ada di dalam database tersebut.
+- ' || (select '' from users where rownum =1) || '
+- ' || (select '' from users where username= 'administrator') || ' #konfirmasi adminitrator
 
 > **Catatan:** Kondisi `WHERE ROWNUM = 1` dipakai karena hanya butuh database mengembalikan 1 baris saja, agar tidak merusak baris gabungan teks cookie-nya.
 
@@ -49,7 +53,7 @@ Mencoba `FROM not-a-real-table` (error), lalu mencoba `FROM users WHERE ROWNUM =
 
 **Langkah:**
 Mencoba `CASE WHEN (1=1) THEN TO_CHAR(1/0)...` (Error 500), lalu ganti `CASE WHEN (1=2)...` (Lancar 200 OK).
-
+' || (select CASE WHEN (1=0) THEN TO_CHAIR(1/0) ELSE '' END FROM dual) || '
 **Penjelasan:**
 Di sinilah logika utama lab ini bekerja — membuat sistem logika otomatis di dalam database:
 
