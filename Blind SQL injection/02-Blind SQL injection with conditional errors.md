@@ -1,41 +1,94 @@
-Langkah 1: Memastikan Titik Suntikan (Injection Point) Bisa Memicu Eror
-Tambahkan tanda kutip tunggal (') di ujung ID asli kamu, contoh: TrackingId=xyz'.
+# 📘 Catatan Belajar: Blind SQL Injection (Oracle) via Cookie
 
-Jika halaman berubah menjadi 500 Internal Server Error, artinya tanda kutip tersebut sukses membuat sintaks database tidak seimbang dan celah keamanannya positif ada.
+Ringkasan tahapan eksploitasi Blind SQL Injection menggunakan teknik *conditional error-based* pada database Oracle, dari deteksi awal sampai ekstraksi password admin.
 
+---
 
+## 🏛️ Fase 1: Tes Apakah Pintu Gudang Bisa Dirusak (Deteksi Awal)
 
-Langkah 2: Membangun Saklar Eror Bersyarat (CASE WHEN)
-Di database Oracle, kita membuat jebakan eror menggunakan fungsi CASE WHEN dan dipadukan dengan operasi ilegal seperti pembagian dengan nol (1/0). Di Oracle, kita juga wajib menyebutkan tabel bawaan bernama FROM dual.
+**Langkah:**
+Mengubah `TrackingId=xyz` menjadi `xyz'` (Error), lalu menjadi `xyz''` (Error hilang).
 
-Tes Kondisi SALAH (Harus Tampil Normal - 200 OK):
-Suntikkan perintah yang logikanya salah (misal 1=2):
-TrackingId=xyz' || (SELECT CASE WHEN (1=2) THEN TO_CHAR(1/0) ELSE NULL END FROM dual) || '
-Karena 1=2 adalah salah, database akan melompati perintah eror 1/0 dan memilih ELSE NULL (halaman tampil normal).
+**Penjelasan:**
+- Memasukkan satu tanda kutip (`'`) untuk merusak struktur kueri database asli di aplikasi. Ketika halaman memunculkan error, itu bukti bahwa input cookie langsung ditempel ke kueri SQL.
+- Memasukkan dua tanda kutip (`''`). Di dalam SQL, dua tanda kutip berurutan artinya "mengabaikan tanda kutip" (*escaping*). Karena kuerinya jadi seimbang lagi, errornya hilang (`200 OK`).
+- ✅ Ini memastikan **100% ada celah SQL Injection**.
 
+---
 
+## 🔍 Fase 2: Menebak Jenis Mesin Database (Oracle Detection)
 
+**Langkah:**
+Mencoba `SELECT ''` (tetap error), lalu mencoba `SELECT '' FROM dual` (lancar / `200 OK`).
 
-Tes Kondisi BENAR (Harus Tampil Eror - 500 Internal Server Error):
-Ubah kondisinya menjadi benar (misal 1=1):
-TrackingId=xyz' || (SELECT CASE WHEN (1=1) THEN TO_CHAR(1/0) ELSE NULL END FROM dual) || '
-Karena 1=1 adalah benar, database terpaksa mengeksekusi THEN TO_CHAR(1/0). Karena angka tidak bisa dibagi nol, database akan mogok kerja dan memicu status eror 500.
+**Penjelasan:**
+Setiap mesin database punya aturan bahasa (*syntax*) berbeda:
 
+- Di **MySQL/SQL Server**, perintah `SELECT ''` itu sah-sah saja.
+- Di **Oracle**, perintah `SELECT` wajib menyebutkan nama tabelnya (`FROM nama_tabel`). Oracle menyediakan tabel tiruan bawaan bernama `dual` untuk keperluan tes.
 
+Karena rumus yang pakai `FROM dual` berhasil membuat errornya hilang, didapat info berharga:
+> 🎯 **Target lab ini menggunakan database Oracle!**
 
-(Jangan lupa untuk memblokir mantra tambahanmu lalu tekan Ctrl + U untuk melakukan URL-Encode agar tandanya tidak rusak di jalur Cookie).
+---
 
-Langkah 3: Memastikan Keberadaan Akun Administrator
-Jika saklar eror di atas sudah bekerja dengan akurat (Benar = Eror 500, Salah = Normal 200), kita ganti kondisi 1=1 tadi untuk memeriksa apakah ada username administrator di tabel users:
-...xyz' || (SELECT CASE WHEN (USERNAME='administrator') THEN TO_CHAR(1/0) ELSE NULL END FROM users) || '
-Jika hasil kirimanmu memicu Eror 500, berarti akun admin valid ditemukan!
+## 📦 Fase 3: Memastikan Tabel `users` Itu Nyata
 
-<img width="1513" height="705" alt="image" src="https://github.com/user-attachments/assets/de926497-c8d7-437b-8cb9-37b4dd431ee2" />
+**Langkah:**
+Mencoba `FROM not-a-real-table` (error), lalu mencoba `FROM users WHERE ROWNUM = 1` (lancar).
 
+**Penjelasan:**
+- Menembak nama tabel asal-asalan → database langsung memicu error karena tabelnya tidak ada.
+- Ganti menjadi `FROM users` → halaman kembali lancar (`200 OK`). Ini membuktikan bahwa tabel bernama `users` benar-benar ada di dalam database tersebut.
 
+> **Catatan:** Kondisi `WHERE ROWNUM = 1` dipakai karena hanya butuh database mengembalikan 1 baris saja, agar tidak merusak baris gabungan teks cookie-nya.
 
-Langkah 4: Menentukan Panjang Password
-Sama seperti Lab 10, kita gunakan fungsi LENGTH(password) di dalam kotak kondisi CASE WHEN:
-...SELECT CASE WHEN (LENGTH(password)>19) THEN TO_CHAR(1/0) ELSE NULL END FROM users WHERE username='administrator'...
-Uji secara bertahap angkanya untuk mengonfirmasi panjang password-nya (biasanya bernilai 20 karakter).
+---
 
+## 🧠 Fase 4: Membuat Saklar Error Bersyarat (`CASE WHEN`)
+
+**Langkah:**
+Mencoba `CASE WHEN (1=1) THEN TO_CHAR(1/0)...` (Error 500), lalu ganti `CASE WHEN (1=2)...` (Lancar 200 OK).
+
+**Penjelasan:**
+Di sinilah logika utama lab ini bekerja — membuat sistem logika otomatis di dalam database:
+
+| Kondisi | Aksi Database | Hasil |
+|---|---|---|
+| **BENAR** (`1=1`) | Eksekusi perintah setelah `THEN`, yaitu `TO_CHAR(1/0)` (pembagian dengan nol) | Database crash → **`500 Internal Server Error`** |
+| **SALAH** (`1=2`) | Lompati perintah pembagian nol, eksekusi `ELSE ''` | Halaman lancar → **`200 OK`** |
+
+---
+
+## 🎯 Fase 5: Interogasi Akun Admin dan Panjang Password
+
+**Langkah:**
+Menguji `username='administrator'` (hasil: Error 500 → admin ada). Lalu menguji `LENGTH(password)>1`, `>2`, dst. menggunakan Repeater sampai errornya hilang.
+
+**Penjelasan:**
+- Memasukkan perintah cek panjang password: `LENGTH(password)>20`.
+- Saat angka dinaikkan bertahap, status akan terus `500 Internal Server Error` (artinya kondisi "lebih besar dari" bernilai **BENAR**).
+- Begitu tebakan angka menyentuh batasnya, kondisi menjadi **SALAH**, pembagian nol dilewati, halaman kembali `200 OK`.
+
+> 📏 Dari situ diketahui **panjang password adalah 20 karakter**.
+
+---
+
+## 🏁 Fase 6: Eksekusi Massal dengan Burp Intruder
+
+**Langkah:**
+Menggunakan rumus `SUBSTR(password,1,1)='§a§'`, mengatur payload `a-z` dan `0-9`, lalu mencari status `500`.
+
+**Penjelasan:**
+- Karena menebak 20 karakter dengan kombinasi huruf dan angka secara manual itu melelahkan, request dipindahkan ke **Burp Intruder**.
+- Fungsi `SUBSTR(password,1,1)` artinya: *"Ambil huruf ke-1, sebanyak 1 karakter"*.
+- Huruf tebakan ditandai dengan simbol `§a§` sebagai target acak Intruder.
+
+**Cara membaca hasil:**
+Saat serangan Intruder berjalan, fokus melihat kolom **Status**. Jika ada baris yang memunculkan status `500`, artinya karakter pada baris itulah yang **BENAR** (karena memicu kondisi pembagian nol).
+
+Setelah huruf posisi ke-1 ketemu, rumus diubah menjadi `SUBSTR(password,2,1)` untuk mencari huruf ke-2, dan seterusnya sampai ke-20 karakter kata sandi terkumpul lengkap untuk login sebagai administrator.
+
+---
+
+> 📌 *Catatan pribadi belajar keamanan web — Blind SQL Injection (Oracle, error-based via cookie).*
